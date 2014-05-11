@@ -133,7 +133,7 @@ const char PSTR_RESET[]     PROGMEM = "RESET";
  * and every fuse value in the structure. */
 FUSES = {
   /* 0xd7 = low */ (FUSE_SUT1 & FUSE_CKSEL3),
-  /* 0x99 = high */ (FUSE_JTAGEN & FUSE_SPIEN & FUSE_BOOTSZ1 & FUSE_BOOTSZ0),
+  /* 0xd9 = high */ (FUSE_SPIEN & FUSE_BOOTSZ1 & FUSE_BOOTSZ0),
   /* 0xfc = extended */ (FUSE_BODLEVEL1 & FUSE_BODLEVEL0)
 };
 
