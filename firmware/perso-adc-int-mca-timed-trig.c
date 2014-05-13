@@ -129,6 +129,9 @@ ISR(ADC_vect)
   //TIFR1 |= _BV(OCF1A);
 }
 
+void display_count_stats(void)
+{
+}
 
 /** Do nothing */
 void on_measurement_finished(void)

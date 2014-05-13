@@ -180,6 +180,9 @@ void adc_int_trigger_src_conf(void)
 
 }
 
+void display_count_stats(void)
+{
+}
 
 /** ADC initialisation and configuration
  *

@@ -167,6 +167,9 @@ ISR(ADC_vect)
   //TIFR1 |= _BV(OCF1A);
 }
 
+void display_count_stats(void)
+{
+}
 
 /** Switch off trigger B to stop any sampling of the analog signal
  *

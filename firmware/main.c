@@ -530,6 +530,8 @@ void main_event_loop(void)
       continue;
     }
 
+    display_count_stats();
+
     /* check whether a byte has arrived via UART */
     if (bit_is_set(UCSR0A, RXC0)) {
       const char ch = uart_getc();

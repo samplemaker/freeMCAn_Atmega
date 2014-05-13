@@ -39,9 +39,9 @@
 
 
 /** Histogram element size */
-#define BITS_PER_VALUE 8
+#define BITS_PER_VALUE 16
 
-
+#include "lcd.h"
 #include "compiler.h"
 #include "global.h"
 #include "packet-comm.h"
@@ -75,6 +75,10 @@ extern volatile table_element_t data_table_end[];
 extern volatile char data_table_size[];
 
 
+/* LCD */
+uint32_t total_counts;
+uint16_t time_elapsed;
+uint8_t lcd_update;
 
 /** Data table info
  *
@@ -138,12 +142,23 @@ INIT_FUNCTION(init5, personality_io_init)
   DDRD |= (_BV(DDD4));
   /* Clear LED on PD4. Will be toggled when a GM event is detected. */
   PORTD &= ~_BV(PD4);
+
+  //DDRD |= _BV(DDD6);
+  //PORTD &= ~_BV(PD6);
+
+  /* Init display */
+  lcd_init(LCD_DISP_ON);
+  lcd_clrscr();
+  lcd_puts("CPM +-1SDEV");
 }
 
 
 /** External INT0, i.e. count a GM event */
 ISR(INT0_vect)
-{
+{ 
+  /* to calculate CPMs */
+  total_counts ++;
+
   /* activate loudspeaker */
   _beep();
   /* toggle output pin with LED */
@@ -167,6 +182,12 @@ ISR(TIMER1_COMPA_vect)
   /* toggle a sign PORTD ^= _BV(PD5); (done automatically) */
 
   if (GF_IS_CLEARED(GF_MEASUREMENT_FINISHED)) {
+
+    lcd_update = 1;
+
+    /* to calculate CPMs */
+    time_elapsed++;
+
     /** We do not touch the measurement_finished flag ever again after
      * setting it. */
     timer1_count--;
@@ -223,6 +244,128 @@ void trigger_src_conf(void)
      * register). we do not want to jump to the ISR in case of an interrupt
      * so we do not set this bit  */
     EIMSK |= (_BV(INT0));
+}
+
+/* const 80 ticks */
+static inline uint8_t
+sqrt16_floor (uint16_t q)
+{
+    uint8_t res = 0;
+    uint8_t mask = 1 << 7;
+ 
+    asm("0:	add  %[res], %[mask]"   "\n"
+        "	mul  %[res], %[res]"    "\n"
+        "	cp   %A[q], R0"         "\n"
+        "	cpc  %B[q], R1"         "\n"
+        "	brsh 1f"                "\n"
+        "	sub  %[res], %[mask]"   "\n"
+        "1:	lsr  %[mask]"           "\n"
+        "	brne 0b"                "\n"
+        "	clr  __zero_reg__"
+        : [res] "+r" (res), [mask] "+r" (mask)
+        : [q] "r" (q));
+ 
+    return res;
+}
+
+inline static uint16_t c_sqrt32 (uint32_t q)
+{
+    uint16_t r, mask;
+    uint16_t i = 8*sizeof (r) -1;
+    r = mask = 1 << i;
+    for (; i > 0; i--){
+       mask >>= 1;
+       if (q < (uint32_t)(r)*(uint32_t)(r))
+          r -= mask;
+       else
+          r += mask;
+    }
+    if (q < (uint32_t)(r)*(uint32_t)(r))
+      r -= 1;
+    return r;
+}
+
+inline static uint32_t divu10(uint32_t n) {
+  uint32_t q, r;
+  q = (n >> 1) + (n >> 2);
+  q = q + (q >> 4);
+  q = q + (q >> 8);
+  q = q + (q >> 16);
+  q = q >> 3;
+  r = n - q*10;
+  return q + ((r + 6) >> 4);
+}
+
+void display_count_stats(void)
+{
+  /*idee: adaptive integrationszeit nach sqrt(N) */
+  if (lcd_update){
+    /* 775us @18.432MHz */
+    //PORTD |= _BV(PD6);
+
+    /* atomic */
+    lcd_update = 0;
+
+    /* make a local copy to be independant from the interrupt handler */
+    uint32_t tmp1;
+    uint32_t l_total_counts = total_counts;
+    do {
+      tmp1 = l_total_counts;
+      l_total_counts = total_counts;
+    } while (l_total_counts != tmp1);
+
+    uint16_t tmp2;
+    uint16_t l_time_elapsed = time_elapsed;
+    do {
+      tmp2 = l_time_elapsed;
+      l_time_elapsed = time_elapsed;
+    } while (l_time_elapsed != tmp2);
+
+    /* visible characters per line */
+    #define max_len 16
+    char ch_str[max_len];
+
+    /* in counts per minute */
+    uint32_t int_rate = (uint32_t)((60UL*10UL*l_total_counts)/l_time_elapsed);
+    /* convert int_rate into string assuming one decimal place */
+    /* # of characters to display including decimal point */
+    #define max_num_rate 7
+    int8_t i = max_num_rate - 1;
+    ch_str[i--] = int_rate % 10 + '0';
+    int_rate /= 10;
+    ch_str[i--] = '.';
+    do {
+       ch_str[i--] = int_rate % 10 + '0';
+    } while ((int_rate /= 10) > 0);
+    while (i >= 0) {
+       ch_str[i--] = ' ';
+    }
+
+    uint16_t rel_tol;
+    /* spent some extra accuracy for low number of counts */
+    rel_tol = (uint16_t)((60UL*100UL*10UL)/c_sqrt32(3600UL*l_total_counts));
+
+    /* convert standard deviation into string assuming one decimal place */
+    i = max_len - 1;
+    ch_str[i--] = '\0';
+    ch_str[i--] = '%';
+    ch_str[i--] = rel_tol % 10 + '0';
+    rel_tol /= 10;
+    ch_str[i--] = '.';
+    do {
+      ch_str[i--] = rel_tol % 10 + '0';
+    } while ((rel_tol /= 10) > 0);
+    ch_str[i--] = '-';
+    ch_str[i--] = '+';
+    while (i >= max_num_rate) {
+       ch_str[i--] = ' ';
+    }
+
+    lcd_gotoxy(0,1);
+    lcd_puts(ch_str);
+
+    //PORTD &= ~_BV(PD6);
+  }
 }
 
 

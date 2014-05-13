@@ -335,6 +335,7 @@ firmware-geiger-ts.elf : .objs/timer1-get-duration.o
 firmware-geiger-ts.elf : .objs/data-table-all-other-memory.o
 firmware-geiger-ts.elf : .objs/perso-geiger-time-series.o
 firmware-geiger-ts.elf : .objs/beep.o
+firmware-geiger-ts.elf : .objs/lcd.o
 	$(LINK.c) $(filter-out %.x,$^) $(LDLIBS) --output $@
 
 
