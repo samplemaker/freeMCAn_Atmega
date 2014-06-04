@@ -416,7 +416,7 @@ MALLOC_HEAP_SIZE = 64
 # size we want to be sure to have space for. We just estimate this
 # value, but we have a consistency check lower down in the form of the
 # check-min-stack-size-%.check target.
-MAX_RUNTIME_STACK_SIZE = 256
+MAX_RUNTIME_STACK_SIZE = 512
 
 # Check that the minimum stack size we want accomodated in a firmware
 # (used for other checks) is actually less than the number of push

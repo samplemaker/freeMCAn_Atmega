@@ -36,7 +36,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-
+#include <util/atomic.h>
 
 /** Histogram element size */
 #define BITS_PER_VALUE 16
@@ -52,6 +52,7 @@
 #include "data-table.h"
 #include "beep.h"
 #include "init-functions.h"
+#include "perso-geiger-time-series.h"
 
 #ifndef F_CPU
 # error Need F_CPU defined for util/delay.h
@@ -114,6 +115,72 @@ volatile table_element_t *volatile table_end =
 volatile table_element_t *volatile table_cur = table;
 
 
+#define MAX_EQ(A, B) (((A) <= (B)) ? (B) : (A))
+#define MIN_EQ(A, B) (((A) <= (B)) ? (A) : (B))
+#define NUMELEM(X) ( sizeof(X)/sizeof(X[0]) )
+
+//#define CPM_PER_USV_TUBE 80.257 //[CPM/(uSv/h) ZP1320]
+#define CPM_PER_USV_TUBE 149.99 //[CPM/(uSv/h) ZP1401]
+//#define CPM_PER_USV_TUBE 694.44 //[CPM/(uSv/h) SI8B]
+//#define CPM_PER_USV_TUBE 18234.86 //[CPM/(uSv/h) 44-2]
+
+/* record time for the short time measurement.
+ * should be around 5 .. 10
+ */
+#define NUM_TIME_UNITS_ST 8UL
+
+/* m*stdev for an N count measurement equals m*sqrt(N). reltol = m*sqrt(N)/N = m/sqrt(N).
+ * To have 90% (1.65 stdev) of the measurements within +-15% of the true count rate 
+ * we have to record 0.15 = 1.65/sqrt(N) => 121 counts
+ * Example ZP1320:
+ * I.e. 0.5uSv/h ~ 40CPM=0.66CPS => Record time ~ 121/0.66=180sec
+*/
+#define NUM_BUF_MAX 120UL
+static volatile uint16_t buf[NUM_BUF_MAX];
+
+/* Internal resolution for the count rate in CPM */
+#define RES_COUNT_RATE 100UL
+
+/* convert to 100xPHYS_DOSE[uSv] */
+#define RES_DOSE 1000
+
+static volatile uint32_t num_counts;
+static volatile uint32_t pos_wr;
+static volatile uint32_t units_recorded;  
+
+/* atomics */
+static volatile uint8_t do_count_stats;
+
+//must not be located in PROGMEM
+static const char dose_str[] = {"uSv/h\0"};
+
+typedef enum {
+  STATE_LOW_RATE,
+  STATE_HIGH_RATE
+} state_range_t;
+
+static state_range_t state_range = STATE_LOW_RATE;
+
+/* expected averaging time for the various ranges to get an acceptable accuracy */
+typedef enum {
+  TIME_LOW_RATE = NUM_BUF_MAX,
+  TIME_HIGH_RATE = 30,
+} range_time_t;
+
+/* threshold rate [PHYS_CPM] x RES_COUNT_RATE for switching between the ranges (autoranging)
+ * ranges including hysteresis must not overlap */
+typedef enum {
+  RATE_LOWHIGH = (RES_COUNT_RATE*80UL), //transition from range "low" to range "high"
+  RATE_HIGHLOW = (RES_COUNT_RATE*40UL), //transition from range "high" to range "low"
+} range_rate_t;
+
+
+inline static
+uint32_t cpm2doserate(uint32_t count_rate){
+ return((RES_DOSE*count_rate)/(uint32_t)(CPM_PER_USV_TUBE*(double)(RES_COUNT_RATE)));
+}
+
+
 /** Print some status messages for debugging */
 INIT_FUNCTION(init8, data_table_print_status)
 {
@@ -148,16 +215,16 @@ INIT_FUNCTION(init5, personality_io_init)
 
   /* Init display */
   lcd_init(LCD_DISP_ON);
+  set_font();
   lcd_clrscr();
-  lcd_puts("CPM +- 1 SDEV");
 }
 
 
 /** External INT0, i.e. count a GM event */
 ISR(INT0_vect)
 { 
-  /* to calculate CPMs */
-  total_counts ++;
+  /* LCD */
+  num_counts++;
 
   /* activate loudspeaker */
   _beep();
@@ -183,10 +250,22 @@ ISR(TIMER1_COMPA_vect)
 
   if (GF_IS_CLEARED(GF_MEASUREMENT_FINISHED)) {
 
-    lcd_update = 1;
-
-    /* to calculate CPMs */
-    time_elapsed++;
+    /* LCD */
+    do_count_stats = 1;
+    if (pos_wr < ((NUM_BUF_MAX) - 1)){
+      pos_wr++;
+    }
+    else{
+      pos_wr = 0;
+    }
+    buf[pos_wr] = num_counts;
+    num_counts = 0;
+    if (units_recorded < (NUM_BUF_MAX)){
+      units_recorded++;
+    }
+    else{
+      units_recorded = (NUM_BUF_MAX);
+    };
 
     /** We do not touch the measurement_finished flag ever again after
      * setting it. */
@@ -247,93 +326,142 @@ void trigger_src_conf(void)
 }
 
 
-inline static uint16_t c_sqrt32 (uint32_t q)
-{
-  uint16_t r, mask;
-  uint16_t i = 8*sizeof (r) -1;
-  r = mask = 1 << i;
-  for (; i > 0; i--){
-     mask >>= 1;
-     if (q < (uint32_t)(r)*(uint32_t)(r))
-       r -= mask;
-     else
-       r += mask;
-  }
-  if (q < (uint32_t)(r)*(uint32_t)(r))
-    r -= 1;
-  return r;
-}
-
-
-const uint32_t base_10[] = {100000, 10000, 1000, 100, 10};
-
-inline static void uint_to_ascii(char *out_str, uint32_t value, int8_t len){
-  uint8_t num;
-  uint8_t tmp = 0;
-
-  for (uint8_t i = 0; i < len; i++){
-     num = 0;
-     while (value >= base_10[i+5-len]){
-       value -= base_10[i+5-len];
-       num++;
-     }
-     tmp += num;
-     if ((tmp > 0) | (i == (len - 1))){
-       *out_str++ = num | 0x30;
-     }
-     else{
-       *out_str++ = ' ';
-     }
-  }
-  *out_str++ = '.';
-  *out_str++ = (char)(value) | 0x30;
-}
-
-
 void display_count_stats(void)
 {
-  /*idee: adaptive integrationszeit nach sqrt(N) */
-  if (lcd_update){
-    /* 775us @18.432MHz */
-    PORTD |= _BV(PD6);
+  char display[17];
+  uint32_t pos_rd;
+  uint32_t units_recorded_cpy;
+  static uint32_t count_rate_estimator_lg = 0;
 
-    /* atomic */
-    lcd_update = 0;
+  if (do_count_stats){
+    do_count_stats = 0;
 
-    /* make a local copy to be independant from the interrupt handler */
-    uint32_t tmp1;
-    uint32_t l_total_counts = total_counts;
-    do {
-      tmp1 = l_total_counts;
-      l_total_counts = total_counts;
-    } while (l_total_counts != tmp1);
+    ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
+      pos_rd = pos_wr; 
+      units_recorded_cpy = units_recorded;
+    }
+ 
+    if (units_recorded_cpy < (NUM_TIME_UNITS_ST)){
+      count_rate_estimator_lg = 0;
+    }
+    else{
 
-    uint16_t tmp2;
-    uint16_t l_time_elapsed = time_elapsed;
-    do {
-      tmp2 = l_time_elapsed;
-      l_time_elapsed = time_elapsed;
-    } while (l_time_elapsed != tmp2);
+      uint32_t units_to_consider = 0;
+      /* autoranging controls the max possible record length and gives higher
+       * dynamic response at higher count rates */
+      switch (state_range) {
+        case (STATE_LOW_RATE) :
+           /* possibly not yet recorded enough samples at boot time */
+           units_to_consider = MIN_EQ(TIME_LOW_RATE, units_recorded_cpy);
+           if (count_rate_estimator_lg > RATE_LOWHIGH){
+             state_range = STATE_HIGH_RATE;
+             units_to_consider = MIN_EQ(TIME_HIGH_RATE, units_recorded_cpy);
+             lcd_gotoxy(4,1);
+             lcd_putc(CHAR_UP);
+           };
+        break;
+        case (STATE_HIGH_RATE) :
+           units_to_consider = MIN_EQ(TIME_HIGH_RATE, units_recorded_cpy);
+           if (count_rate_estimator_lg < RATE_HIGHLOW){
+             state_range = STATE_LOW_RATE;
+             units_to_consider = MIN_EQ(TIME_LOW_RATE, units_recorded_cpy);
+             lcd_gotoxy(4,1);
+             lcd_putc(CHAR_DOWN);
+           };
+        break;
+        default:
+        break;
+      }
 
-    char display[17];
+      /* calculate the sum over various buffer lengths */
+      uint32_t sum_new2=0, sum_old2=0, sum_short=0;
+      uint16_t units_to_consider2 = (units_to_consider >> 1);
+      uint32_t sum_total=0;
+      uint16_t i=0;
+      uint16_t current_pos = pos_rd;
+      while (i < units_to_consider) {
+        sum_total += buf[current_pos];
+        if (current_pos){
+          current_pos--;
+        }
+        else{
+          current_pos = NUMELEM(buf) - 1;
+        }
+        i++;
+        if (i == units_to_consider2) sum_new2 = sum_total;
+        if (i == 2*units_to_consider2) sum_old2 = sum_total;
+        if (i == NUM_TIME_UNITS_ST) sum_short = sum_total;
+      }
+      sum_old2 = sum_old2 - sum_new2;
 
-    /* in counts per minute */
-    uint32_t int_rate = (uint32_t)((60UL*10UL*l_total_counts)/l_time_elapsed);
-    /* spent some extra accuracy for low number of counts */
-    uint16_t rel_tol = (uint16_t)((60UL*100UL*10UL)/c_sqrt32(3600UL*l_total_counts));
+      /* CPM over the whole record */
+      count_rate_estimator_lg = (RES_COUNT_RATE*60UL*sum_total)/
+                                (units_to_consider);
 
-    uint_to_ascii(display, int_rate, 5);
-    display[7]=' ';
-    display[8]='+';
-    display[9]='-';
-    uint_to_ascii(&display[10], rel_tol, 3);
-    display[15]='%';
-    display[16]='\0';
+      /* average and deviation for the past NUM_TIME_UNITS_ST counts
+       * this is to detect a promt count rate excursion */
+      const uint32_t count_rate_estimator_st = (RES_COUNT_RATE*60UL*sum_short)/
+                                               (NUM_TIME_UNITS_ST);
+      /* standard deviation of the short time measurement calculated
+       * from the long time count rate */
+      const uint16_t stdev_st = c_sqrt32((count_rate_estimator_lg*
+                                          RES_COUNT_RATE*60UL)/
+                                          NUM_TIME_UNITS_ST);
+      /* for simplicity we assume that the short time stdev is much
+       * greater than the long term */
+      const int32_t count_rate_diff = (int32_t)(count_rate_estimator_lg)-
+                                      (int32_t)(count_rate_estimator_st);
 
-    lcd_gotoxy(0,1);
-    lcd_puts(display);
+      /* two measurements with equal measurement time (units_to_consider2)
+       * this is to detect long term drifts (~ compare the first half of
+       * the record with the second half). since both records have same
+       * length we don't need to bother with count rates.
+       * statistical test with 99.2% ~ sqrt(7)=k_[1-gamma]/2 */
+      const uint16_t counts_thresh2 = (c_sqrt32((sum_old2+sum_new2)*7UL));
+      int32_t counts_diff2 = (((int32_t)(sum_new2) - (int32_t)(sum_old2)));
 
-    PORTD &= ~_BV(PD6);
+      if (labs(counts_diff2) > counts_thresh2){
+        ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
+           units_recorded = NUM_TIME_UNITS_ST;
+        }
+        lcd_gotoxy(2,1);
+        lcd_putc('L');
+      }
+      /* promt short time excursion more than 4 stdevs */
+      if (labs(count_rate_diff) > 4*stdev_st) {
+        ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
+           units_recorded = NUM_TIME_UNITS_ST;
+        }
+        lcd_gotoxy(2,1);
+        lcd_putc('S');
+      }
+
+      const uint32_t doserate = cpm2doserate(count_rate_estimator_lg);
+      if (doserate < 10*RES_DOSE){
+        /* 3 decimal places 4 digits: 0.000 .. 9.999; RES_DOSE=10^3 */
+        uint_to_ascii(display, doserate, 3, 4);
+        lcd_gotoxy(0,0);
+        lcd_puts(display);
+      }
+      else{
+        /* 2 decimal places 4 digits: 10.00 .. 99.99; RES_DOSE=10^3 */
+        uint_to_ascii(display, doserate/10, 2, 4);
+        lcd_gotoxy(0,0);
+        lcd_puts(display);
+      }
+
+      /* 1 decimal place 6 digits; RES_COUNT_RATE=10^2  */
+      uint_to_ascii(display, count_rate_estimator_lg, 2, 6);
+      lcd_gotoxy(9,1);
+      lcd_puts(display);
+
+      uint_to_ascii(display, units_to_consider, 0, 3);
+      lcd_gotoxy(13,0);
+      lcd_puts(display);
+
+      lcd_gotoxy(0,1);
+      lcd_putc(get_indicator());
+    }
   }
 }
 
@@ -347,6 +475,9 @@ void on_measurement_finished(void)
 
 void personality_start_measurement_sram(void)
 {
+  lcd_gotoxy(5,0);
+  lcd_puts(dose_str);
+
   const void *voidp = &pparam_sram.params[0];
   const uint16_t *timer1_value = voidp;
   trigger_src_conf();
