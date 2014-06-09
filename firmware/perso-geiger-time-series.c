@@ -153,6 +153,7 @@ static volatile uint8_t do_count_stats;
 
 //must not be located in PROGMEM
 static const char dose_str[] = {"uSv/h\0"};
+static const char cpm_str[] = {"CPM\0"};
 
 typedef enum {
   STATE_LOW_RATE,
@@ -452,7 +453,7 @@ void display_count_stats(void)
 
       /* 1 decimal place 6 digits; RES_COUNT_RATE=10^2  */
       uint_to_ascii(display, count_rate_estimator_lg, 2, 6);
-      lcd_gotoxy(9,1);
+      lcd_gotoxy(6,1);
       lcd_puts(display);
 
       uint_to_ascii(display, units_to_consider, 0, 3);
@@ -477,7 +478,8 @@ void personality_start_measurement_sram(void)
 {
   lcd_gotoxy(5,0);
   lcd_puts(dose_str);
-
+  lcd_gotoxy(13,1);
+  lcd_puts(cpm_str);
   const void *voidp = &pparam_sram.params[0];
   const uint16_t *timer1_value = voidp;
   trigger_src_conf();
