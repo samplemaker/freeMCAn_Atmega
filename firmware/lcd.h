@@ -89,16 +89,23 @@
 #define LCD_DATA1_PORT   LCD_PORT     /**< port for 4bit data bit 1 */
 #define LCD_DATA2_PORT   LCD_PORT     /**< port for 4bit data bit 2 */
 #define LCD_DATA3_PORT   LCD_PORT     /**< port for 4bit data bit 3 */
-#define LCD_DATA0_PIN    0            /**< pin for 4bit data bit 0  */
-#define LCD_DATA1_PIN    1            /**< pin for 4bit data bit 1  */
-#define LCD_DATA2_PIN    2            /**< pin for 4bit data bit 2  */
-#define LCD_DATA3_PIN    3            /**< pin for 4bit data bit 3  */
-#define LCD_RS_PORT      LCD_PORT     /**< port for RS line         */
-#define LCD_RS_PIN       4            /**< pin  for RS line         */
-#define LCD_RW_PORT      LCD_PORT     /**< port for RW line         */
-#define LCD_RW_PIN       5            /**< pin  for RW line         */
-#define LCD_E_PORT       LCD_PORT     /**< port for Enable line     */
-#define LCD_E_PIN        6            /**< pin  for Enable line     */
+// DB4: LCD Pin 11 -> ATMEGA PIN 25 / PC3
+#define LCD_DATA0_PIN    3
+// DB5: LCD Pin 12 -> ATMEGA PIN 26 / PC4
+#define LCD_DATA1_PIN    4
+// DB6: LCD Pin 13 -> ATMEGA PIN 27 / PC5
+#define LCD_DATA2_PIN    5
+// DB7: LCD Pin 14 -> ATMEGA PIN 28 / PC6
+#define LCD_DATA3_PIN    6
+#define LCD_RS_PORT      LCD_PORT
+// RS: LCD Pin 4 -> ATMEGA PIN 22 / PC0
+#define LCD_RS_PIN       0
+#define LCD_RW_PORT      LCD_PORT
+// RW: LCD Pin 5 -> ATMEGA PIN 23 / PC1
+#define LCD_RW_PIN       1
+#define LCD_E_PORT       LCD_PORT
+// E: LCD Pin 6 -> ATMEGA PIN 24 / PC2
+#define LCD_E_PIN        2
 
 #elif defined(__AVR_AT90S4414__) || defined(__AVR_AT90S8515__) || defined(__AVR_ATmega64__) || \
       defined(__AVR_ATmega8515__)|| defined(__AVR_ATmega103__) || defined(__AVR_ATmega128__) || \
