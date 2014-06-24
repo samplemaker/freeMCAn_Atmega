@@ -206,11 +206,11 @@ void trigger_src_conf(void)
 //send the bloody data
 void send_data_from_ringbuf(void)
 {
-  //ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
+  ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
     const size_t size_to_send = data_table_info.size;
     const volatile uint32_t ofs_wr_cpy = ofs_wr;
     data_table_info.size = 0;
-  //}
+  }
   const volatile char * wr_ptr = strt_ptr + ofs_wr_cpy;
   const size_t size_new = wr_ptr - strt_ptr; // = ofs_wr_cpy
   if (size_new > size_to_send){
