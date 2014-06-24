@@ -4,12 +4,15 @@
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "freemcan-xively.h"
 
-static const char device_key[]="tbd";
+#define CPM_PER_USV_TUBE 80.257 //[CPM/(uSv/h) ZP1320]
+
+static const char device_key[]=" ";
 static const char channel[]="freemcan\0";
-static const int feed_id = 123;
+static const int feed_id = 2;
 
 static xi_context_t* xi_context;
 
@@ -30,10 +33,10 @@ void close_xively(void){
 }
 
 
-int put_point(const int data, const time_t timestamp){
+int put_point(const float data, const time_t timestamp){
 
     xi_datapoint_t datapoint;
-    xi_set_value_i32(&datapoint, data);
+    xi_set_value_f32(&datapoint, data);
     datapoint.timestamp.timestamp = timestamp;
     xi_datastream_update(xi_context,
                          feed_id,
@@ -88,7 +91,9 @@ xi_feed_t
        const time_t ts = start_time + i * tdur;
        const char *st = time_to(ts);
        printf("%zu\t%u\t%ld\t%s\n\r", i, value_table_packet->elements[i], ts, st);
-       put_point(value_table_packet->elements[i], ts);
+       const float dose_rate = 60.0*(float)(value_table_packet->elements[i])/((float)(tdur)*CPM_PER_USV_TUBE);
+       const float rnd_data = floorf(dose_rate * 1000.0 + 0.5) / 1000.0;
+       put_point(rnd_data, ts);
     }
     close_xively();
   }
