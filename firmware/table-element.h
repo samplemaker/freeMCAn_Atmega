@@ -28,7 +28,7 @@
 #define TABLE_ELEMENT_H
 
 /** Histogram element size */
-#define BITS_PER_VALUE 32
+#define BITS_PER_VALUE 24
 
 #ifndef IN_LINKERCOMMAND_FILE
 

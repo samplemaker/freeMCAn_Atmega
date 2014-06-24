@@ -35,10 +35,9 @@
 avr-gcc -E -nostdinc -P -C data-table-all-other-memory.S -c -o data-table-all-other-memory.x
 */
 SECTIONS {
-  data_table = __noinit_end + 4;
-  data_table &= ~ ((1 << (BITS_PER_VALUE / 8)) - 1 ) ; 
-  data_table_end = ( RAM_END - MAX_RUNTIME_STACK_SIZE - MALLOC_HEAP_SIZE ) ;
-  data_table_end &= ~ ((1 << (BITS_PER_VALUE / 8)) - 1 ) ; 
+  data_table = ALIGN(( __noinit_end ), BITS_PER_VALUE / 8) ;
+  data_table_end = ( RAM_END - MAX_RUNTIME_STACK_SIZE - MALLOC_HEAP_SIZE - 4 ) ;
+  data_table_end = ALIGN(( data_table_end ), BITS_PER_VALUE / 8) ;
   data_table_size = data_table_end - data_table ;
   /* Unused definitions for table size in different units
    * data_table_size_by_2 = data_table_size / 2 ;
@@ -51,5 +50,5 @@ SECTIONS {
 
 }
 INSERT AFTER .noinit ;
-ASSERT ( ( __heap_end + MAX_RUNTIME_STACK_SIZE + 4 ) <= RAM_END, "(data+stack+table) size is too large for SRAM") ;
+ASSERT ( ( __heap_end + MAX_RUNTIME_STACK_SIZE ) <= RAM_END, "(data+stack+table) size is too large for SRAM") ;
 ASSERT ( data_table_size >= 1024, "data table size is smaller than 1K" ) ;
