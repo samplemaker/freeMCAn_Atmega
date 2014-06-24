@@ -36,6 +36,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/atomic.h>
 
 #include "compiler.h"
 #include "global.h"
@@ -206,9 +207,11 @@ void trigger_src_conf(void)
 //send the bloody data
 void send_data_from_ringbuf(void)
 {
+  size_t size_to_send;
+  volatile uint32_t ofs_wr_cpy;
   ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
-    const size_t size_to_send = data_table_info.size;
-    const volatile uint32_t ofs_wr_cpy = ofs_wr;
+    size_to_send = data_table_info.size;
+    ofs_wr_cpy = ofs_wr;
     data_table_info.size = 0;
   }
   const volatile char * wr_ptr = strt_ptr + ofs_wr_cpy;
