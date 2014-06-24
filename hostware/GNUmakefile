@@ -15,7 +15,7 @@ CFLAGS += -Wall -Wextra
 CFLAGS += -g
 CFLAGS += -I../include
 CFLAGS += -O -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector --param=ssp-buffer-size=4
-LDLIBS += -lm
+LDLIBS += -lm ./libxively/obj/libxively.a
 
 
 include ../common.mk
@@ -70,11 +70,13 @@ clean:
 .objs/freemcan-device.o : CFLAGS += -D_GNU_SOURCE
 .objs/freemcan-tui.o : CFLAGS += -D_GNU_SOURCE
 .objs/freemcan-tui-main-select.o : CFLAGS += -D_GNU_SOURCE
+.objs/freemcan-xively.o : CFLAGS += -I./libxively/src/libxively/ -fstrict-aliasing
 
 TUI_COMMON_OBJ =
 TUI_COMMON_OBJ += .objs/freemcan-checksum.o
 TUI_COMMON_OBJ += .objs/freemcan-device.o
 TUI_COMMON_OBJ += .objs/freemcan-export.o
+TUI_COMMON_OBJ += .objs/freemcan-xively.o
 TUI_COMMON_OBJ += .objs/frame.o
 TUI_COMMON_OBJ += .objs/frame-parser.o
 TUI_COMMON_OBJ += .objs/freemcan-iohelpers.o

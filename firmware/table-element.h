@@ -27,6 +27,10 @@
 #ifndef TABLE_ELEMENT_H
 #define TABLE_ELEMENT_H
 
+/** Histogram element size */
+#define BITS_PER_VALUE 32
+
+#ifndef IN_LINKERCOMMAND_FILE
 
 #ifndef BITS_PER_VALUE
 # error Error: You MUST define BITS_PER_VALUE before #include "table-element.h"!
@@ -55,7 +59,6 @@ typedef
 # error Unsupported BITS_PER_VALUE
 #endif
   table_element_t;
-
 
 #if (BITS_PER_VALUE == 24)
 /** Increment 24bit unsigned integer */
@@ -219,6 +222,7 @@ uint8_t table_element_cmp_eq(volatile table_element_t *element,
 
 #endif
 
+#endif /* !IN_LINKERCOMMAND_FILE */
 
 #endif /* !TABLE_ELEMENT_H */
 

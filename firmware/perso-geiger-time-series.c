@@ -37,15 +37,11 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-
-/** Histogram element size */
-#define BITS_PER_VALUE 8
-
-
 #include "compiler.h"
 #include "global.h"
 #include "packet-comm.h"
 #include "timer1-measurement.h"
+#include "uart-comm.h"
 #include "uart-printf.h"
 #include "main.h"
 #include "table-element.h"
@@ -59,20 +55,16 @@
 #include <util/delay.h>
 
 
-/** The table
- *
- * Note that we have the table location and size determined by the
- * linker script time-series-table.x.
- */
-extern volatile table_element_t table[] asm("data_table");
+#define TELEMENT_SIZE (sizeof(table_element_t))
 
+extern volatile char strt_ptr[] asm("data_table");
+extern volatile char end_ptr[] asm("data_table_end");
+extern char data_table_size[];
+const size_t table_size = (size_t) data_table_size;
 
-/** End of the table: Still needs rounding */
-extern volatile table_element_t data_table_end[];
+static volatile table_element_t num_counts;
 
-
-/** Pseudo symbol - just use its address */
-extern volatile char data_table_size[];
+static volatile uint32_t ofs_wr;
 
 
 
@@ -85,7 +77,7 @@ data_table_info_t data_table_info = {
    * We update this value whenever new time series data has been
    * recorded. The initial value is "one element".
    */
-  sizeof(table[0]),
+  0,
   /** Type of value table we send */
   VALUE_TABLE_TYPE_TIME_SERIES,
   /** Table element size */
@@ -97,35 +89,8 @@ data_table_info_t data_table_info = {
 PERSONALITY("geiger-time-series",
             2,0,
             1,
-            ((size_t)(&data_table_size)),
+            0,
             BITS_PER_VALUE);
-
-
-/** End of the table: Never write to *table_cur when (table_cur>=table_end)! */
-volatile table_element_t *volatile table_end =
-  (table_element_t volatile *)((char *)data_table_end -
-                                   (sizeof(table_element_t)-1));
-
-/** Pointer to the current place to store the next value at */
-volatile table_element_t *volatile table_cur = table;
-
-
-/** Print some status messages for debugging */
-INIT_FUNCTION(init8, data_table_print_status)
-{
-#ifdef VERBOSE_STARTUP_MESSAGES
-  uprintf("<data_table_print_status>");
-  uprintf("%-25s %p", "table",      table);
-  uprintf("%-25s %p", "table_cur",  table_cur);
-  uprintf("%-25s %p", "table_end",  table_end);
-  const size_t UV(sizeof_table) = ((char*)table_end) - ((char*)table_cur);
-  uprintf("%-25s 0x%x = %d >= %d * %d",
-          "table_end - table_cur",
-          _UV(sizeof_table), _UV(sizeof_table),
-          _UV(sizeof_table)/sizeof(*table_cur), sizeof(*table_cur));
-  uprintf("</data_table_print_status>");
-#endif
-}
 
 
 /** Initialize peripherals
@@ -149,9 +114,8 @@ ISR(INT0_vect)
   /* toggle output pin with LED */
   PIND |= _BV(PD4);
 
-  if (table_cur < table_end) {
-    table_element_inc(table_cur);
-  }
+  table_element_inc(&num_counts);
+
   /* debounce any pending unwanted interrupts caused bouncing
      during transition */
   EIFR |= _BV(INTF0);
@@ -170,15 +134,27 @@ ISR(TIMER1_COMPA_vect)
     /** We do not touch the measurement_finished flag ever again after
      * setting it. */
     timer1_count--;
+
     if (timer1_count == 0) {
-      /* Timer has elapsed. Advance to next counter element in time
-       * series, and restart the timer countdown. */
-      table_cur++;
-      if (table_cur < table_end) {
-        data_table_info.size += sizeof(*table_cur);
+
+      table_element_copy((volatile table_element_t *)(strt_ptr + ofs_wr),
+                         &num_counts);
+      table_element_zero(&num_counts);
+      data_table_info.size += (TELEMENT_SIZE);
+      if (ofs_wr < ((table_size) - (TELEMENT_SIZE))){
+        ofs_wr += (TELEMENT_SIZE);
+      }
+      else{
+        ofs_wr = 0;
+      }
+
+      if (data_table_info.size < (table_size)) {
         timer1_count = orig_timer1_count;
       } else {
-        GF_SET(GF_MEASUREMENT_FINISHED);
+        //in case of overflow overwrite the record data
+        timer1_count = orig_timer1_count;
+        data_table_info.size = table_size;
+        //GF_SET(GF_MEASUREMENT_FINISHED);
       }
     }
   }
@@ -223,6 +199,30 @@ void trigger_src_conf(void)
      * register). we do not want to jump to the ISR in case of an interrupt
      * so we do not set this bit  */
     EIMSK |= (_BV(INT0));
+}
+
+
+
+//send the bloody data
+void send_data_from_ringbuf(void)
+{
+  //ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
+    const size_t size_to_send = data_table_info.size;
+    const volatile uint32_t ofs_wr_cpy = ofs_wr;
+    data_table_info.size = 0;
+  //}
+  const volatile char * wr_ptr = strt_ptr + ofs_wr_cpy;
+  const size_t size_new = wr_ptr - strt_ptr; // = ofs_wr_cpy
+  if (size_new > size_to_send){
+     uart_putb((const void *)(wr_ptr - size_to_send), size_to_send);
+  }
+  else
+  {
+     const size_t size_old = size_to_send - size_new;
+     const volatile char * rd_ptr = end_ptr - size_old;
+     uart_putb((const void *)rd_ptr, size_old);
+     uart_putb((const void *)strt_ptr, size_new);
+  }
 }
 
 

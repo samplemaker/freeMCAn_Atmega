@@ -52,6 +52,7 @@ extern personality_param_t pparam_sram;
  */
 void on_measurement_finished(void);
 
+void send_data_from_ringbuf(void);
 
 void personality_start_measurement_sram(void);
 void personality_start_measurement_eeprom(void);

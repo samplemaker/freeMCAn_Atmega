@@ -296,35 +296,6 @@ COMMON_X += check-data-stack-in-SRAM.x
 
 
 # ======================================================================
-# Firmware personality: MCA using internal ADC
-PERSONALITIES += adc-int-mca
-firmware-adc-int-mca.elf : $(COMMON_OBJ) $(COMMON_X)
-firmware-adc-int-mca.elf : .objs/timer1-init-simple.o
-firmware-adc-int-mca.elf : .objs/timer1-countdown-and-stop.o
-firmware-adc-int-mca.elf : .objs/timer1-get-duration.o
-firmware-adc-int-mca.elf : .objs/perso-adc-int-mca-ext-trig.o
-	$(LINK.c) $^ $(LDLIBS) --output $@
-
-# ======================================================================
-# Firmware personality: MCA using internal ADC, timed trigger
-PERSONALITIES += adc-int-mca-timed
-firmware-adc-int-mca-timed.elf : $(COMMON_OBJ) $(COMMON_X)
-firmware-adc-int-mca-timed.elf : .objs/timer1-adc-trigger.o
-firmware-adc-int-mca-timed.elf : .objs/perso-adc-int-mca-timed-trig.o
-	$(LINK.c) $^ $(LDLIBS) --output $@
-
-# ======================================================================
-# Firmware personality: Sample recording using internal ADC, timed trigger
-PERSONALITIES += adc-int-timed-sampling
-firmware-adc-int-timed-sampling.elf : LDFLAGS += -T data-table-all-other-memory.x
-firmware-adc-int-timed-sampling.elf : data-table-all-other-memory.x
-firmware-adc-int-timed-sampling.elf : $(COMMON_OBJ) $(COMMON_X)
-firmware-adc-int-timed-sampling.elf : .objs/timer1-adc-trigger.o
-firmware-adc-int-timed-sampling.elf : .objs/data-table-all-other-memory.o
-firmware-adc-int-timed-sampling.elf : .objs/perso-adc-int-log-timed-trig.o
-	$(LINK.c) $(filter-out %.x,$^) $(LDLIBS) --output $@
-
-# ======================================================================
 # Firmware personality: Geiger Counter with time series
 PERSONALITIES += geiger-ts
 firmware-geiger-ts.elf : LDFLAGS += -T data-table-all-other-memory.x
@@ -497,6 +468,8 @@ program program-eeprom:
 	@$(MKDIR_P) $(@D)
 	$(CC) -c $(ASFLAGS) $(CPPFLAGS) $< -o $@
 
+data-table-all-other-memory.x:
+	$(CC) -E -nostdinc -P -C data-table-all-other-memory.S -c -o data-table-all-other-memory.x
 
 ########################################################################
 # Automatic dependency generation
@@ -531,6 +504,7 @@ clean:
 	rm -f *.o
 	rm -f *~
 	rm -rf .deps .objs
+	rm -f data-table-all-other-memory.x
 
 
 ########################################################################

@@ -51,6 +51,7 @@
 
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <time.h>
 
 #include "compiler.h"
 
@@ -64,6 +65,8 @@
 #include "freemcan-iohelpers.h"
 #include "freemcan-log.h"
 #include "freemcan-tui.h"
+
+#include "freemcan-xively.h"
 
 #include "git-version.h"
 
@@ -100,7 +103,7 @@ bool periodic_update_flag = false;
 
 
 /** Interval in seconds */
-unsigned long periodic_update_interval = 20;
+unsigned long periodic_update_interval = 60;
 
 
 /** Size of last received packet */
@@ -114,21 +117,7 @@ uint16_t last_sent_duration = 0;
 /** \bug Needs to work with personalities which only need skip_samples, but no duration! */
 static void recalculate_periodic_interval(void)
 {
-  const unsigned long last_periodic_update_interval = periodic_update_interval;
-  if (last_sent_duration && personality_info) {
-    const float clock_period = 1.0f/((float)personality_info->units_per_second);
-    const float tmp = 1.5*sqrt(last_sent_duration*clock_period);
-    periodic_update_interval = tmp + ((last_received_size * 10UL) / 115200UL);
-    if (periodic_update_interval < 5) {
-      periodic_update_interval = 5;
-    }
-  } else {
-    periodic_update_interval = 20;
-  }
-  if (last_periodic_update_interval != periodic_update_interval) {
-    fmlog("Periodic update interval updated from %lu to %lu",
-          last_periodic_update_interval, periodic_update_interval);
-  }
+
 }
 
 
@@ -495,7 +484,7 @@ void tui_do_io(void)
           recalculate_periodic_interval();
           fmlog("Periodic updates now enabled (every %lu seconds)",
                 periodic_update_interval);
-          tui_device_send_simple_command(FRAME_CMD_INTERMEDIATE);
+          //tui_device_send_simple_command(FRAME_CMD_INTERMEDIATE);
         } else {
           fmlog("Periodic updates now disabled");
         }
@@ -706,12 +695,12 @@ static void packet_handler_value_table(packet_value_table_t *value_table_packet,
            type_str, reason_str);
 
   fmlog(buf, element_count, value_table_packet->duration);
-  fmlog_value_table("< ", value_table_packet->elements, element_count);
+  //fmlog_value_table("< ", value_table_packet->elements, element_count);
 
-  if (element_count > 0) {
-    /* export current value table to file(s) */
-    export_value_table(personality_info, value_table_packet);
-  }
+  push_xively(personality_info, value_table_packet);
+
+  /* export current value table to file(s) */
+  //export_value_table(personality_info, value_table_packet);
 
   packet_value_table_unref(value_table_packet);
 }
