@@ -63,7 +63,7 @@ extern volatile char end_ptr[] asm("data_table_end");
 extern char data_table_size[];
 const size_t table_size = (size_t) data_table_size;
 
-static volatile table_element_t num_counts;
+static volatile table_element_t accu_counts_rbuf;
 
 static volatile uint32_t ofs_wr;
 
@@ -74,10 +74,8 @@ static volatile uint32_t ofs_wr;
  * \see data_table
  */
 data_table_info_t data_table_info = {
-  /** Actual size of #data_table in bytes
-   * We update this value whenever new time series data has been
-   * recorded. The initial value is "one element".
-   */
+  /* initialize data_table_info->size = 0 
+   * needed for ring buffer calculations */
   0,
   /** Type of value table we send */
   VALUE_TABLE_TYPE_TIME_SERIES,
@@ -90,7 +88,7 @@ data_table_info_t data_table_info = {
 PERSONALITY("geiger-time-series",
             2,0,
             1,
-            0,
+            -1, //table size used only in histogram related firmwares
             BITS_PER_VALUE);
 
 
@@ -115,7 +113,7 @@ ISR(INT0_vect)
   /* toggle output pin with LED */
   PIND |= _BV(PD4);
 
-  table_element_inc(&num_counts);
+  table_element_inc(&accu_counts_rbuf);
 
   /* debounce any pending unwanted interrupts caused bouncing
      during transition */
@@ -139,8 +137,8 @@ ISR(TIMER1_COMPA_vect)
     if (timer1_count == 0) {
 
       table_element_copy((volatile table_element_t *)(strt_ptr + ofs_wr),
-                         &num_counts);
-      table_element_zero(&num_counts);
+                         &accu_counts_rbuf);
+      table_element_zero(&accu_counts_rbuf);
       data_table_info.size += (TELEMENT_SIZE);
       if (ofs_wr < ((table_size) - (TELEMENT_SIZE))){
         ofs_wr += (TELEMENT_SIZE);
