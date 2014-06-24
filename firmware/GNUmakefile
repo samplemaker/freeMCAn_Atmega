@@ -468,8 +468,6 @@ program program-eeprom:
 	@$(MKDIR_P) $(@D)
 	$(CC) -c $(ASFLAGS) $(CPPFLAGS) $< -o $@
 
-data-table-all-other-memory.x : data-table-all-other-memory.S
-	$(CC) -E -nostdinc -P -C data-table-all-other-memory.S -c -o data-table-all-other-memory.x
 
 ########################################################################
 # Automatic dependency generation
@@ -504,8 +502,6 @@ clean:
 	rm -f *.o
 	rm -f *~
 	rm -rf .deps .objs
-	rm -f data-table-all-other-memory.x
-
 
 ########################################################################
 # End of GNUmakefile

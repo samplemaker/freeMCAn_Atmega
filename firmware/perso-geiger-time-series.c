@@ -33,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/** Histogram element size */
+#define BITS_PER_VALUE 24
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -54,6 +56,7 @@
 # error Need F_CPU defined for util/delay.h
 #endif
 #include <util/delay.h>
+
 
 
 #define TELEMENT_SIZE (sizeof(table_element_t))
