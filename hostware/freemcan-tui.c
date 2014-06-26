@@ -697,7 +697,8 @@ static void packet_handler_value_table(packet_value_table_t *value_table_packet,
   fmlog(buf, element_count, value_table_packet->duration);
   //fmlog_value_table("< ", value_table_packet->elements, element_count);
 
-  push_xively(personality_info, value_table_packet);
+  //to be implemented: https
+  //push_xively(personality_info, value_table_packet);
 
   /* export current value table to file(s) */
   //export_value_table(personality_info, value_table_packet);
