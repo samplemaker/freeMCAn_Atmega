@@ -332,6 +332,7 @@ firmware-geiger-ts.elf : data-table-all-other-memory.x
 firmware-geiger-ts.elf : $(COMMON_OBJ) $(COMMON_X)
 firmware-geiger-ts.elf : .objs/timer1-init-simple.o
 firmware-geiger-ts.elf : .objs/timer1-get-duration.o
+firmware-geiger-ts.elf : .objs/perso-geiger-lcd.o
 firmware-geiger-ts.elf : .objs/data-table-all-other-memory.o
 firmware-geiger-ts.elf : .objs/perso-geiger-time-series.o
 firmware-geiger-ts.elf : .objs/beep.o
