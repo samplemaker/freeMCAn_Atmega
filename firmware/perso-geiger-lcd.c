@@ -114,9 +114,9 @@ get_stats(statistics_t * statistics,
    uint16_t num_proceed2 = (num_proceed >> 1);
    uint16_t i=0;
    uint16_t current_pos = elements->head_cpy;
-   statistics->sum_total = 0;
+   uint32_t sum_total = 0;
    while (i < num_proceed) {
-      statistics->sum_total += elements->rbuf[current_pos];
+      sum_total += elements->rbuf[current_pos];
       if (current_pos){
         current_pos--;
       }
@@ -124,11 +124,12 @@ get_stats(statistics_t * statistics,
         current_pos = elements->num_max - 1;
       }
       i++;
-      if (i == num_proceed2) statistics->sum_new2 = statistics->sum_total;
-      if (i == 2*num_proceed2) statistics->sum_old2 = statistics->sum_total;
-      if (i == statistics->num_short) statistics->sum_short = statistics->sum_total;
+      if (i == num_proceed2) statistics->sum_new2 = sum_total;
+      if (i == 2*num_proceed2) statistics->sum_old2 = sum_total;
+      if (i == statistics->num_short) statistics->sum_short = sum_total;
    }
    statistics->sum_old2 = statistics->sum_old2 - statistics->sum_new2;
+   statistics->sum_total = sum_total;
 
    /* average CPM over the whole record */
    statistics->count_rate_estimator_lg = (RES_COUNT_RATE*60UL*statistics->sum_total)/
