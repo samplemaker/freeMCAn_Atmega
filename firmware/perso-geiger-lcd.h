@@ -57,7 +57,7 @@
  * Attention: This number must be even.
  */
 
-#define NUM_BUF_MAX 120UL
+#define NUM_BUF_MAX 80UL
 
 /* Internal resolution for the count rate in CPM */
 #define RES_COUNT_RATE 10UL
