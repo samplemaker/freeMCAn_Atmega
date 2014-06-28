@@ -1,4 +1,4 @@
-/** \file firmware/freemcan-lcd.h
+/** \file firmware/perso-geiger-lcd.h
  * \brief Freemcan statistical package for LCD display
  * \author Copyright (C) 2014 Samplemaker
  *
@@ -24,13 +24,12 @@
  */
 
 
-#ifndef FREEMCAN_LCD_H
-#define FREEMCAN_LCD_H
+#ifndef PERSO_GEIGER_LCD_H
+#define PERSO_GEIGER_LCD_H
 
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <avr/pgmspace.h>
 
 //#define CPM_PER_USV_TUBE 80.257 //[CPM/(uSv/h) ZP1320]
 //#define CPM_PER_USV_TUBE 149.99 //[CPM/(uSv/h) ZP1401]
@@ -69,26 +68,6 @@
 #define MIN_EQ(A, B) (((A) <= (B)) ? (A) : (B))
 #define NUMELEM(X) ( sizeof(X)/sizeof(X[0]) )
 
-typedef enum {
-  CHAR_1,
-  CHAR_2,
-  CHAR_3,
-  CHAR_4,
-  CHAR_UP,
-  CHAR_DOWN,
-  NUM_CHAR
-} st_indicator_t;
-
-
-static const char PROGMEM font[NUM_CHAR][8]={
-{0x0,0x10,0x8,0x4,0x2,0x1,0x0,0x0}, //'\'
-{0x4,0x4,0x4,0x4,0x4,0x4,0x4,0x0},  //'|'
-{0x0,0x1,0x2,0x4,0x8,0x10,0x0,0x0}, //'/'
-{0x0,0x0,0x0,0x1f,0x0,0x0,0x0,0x0}, //'-'
-{0x4,0xe,0x1f,0x4,0x4,0x4,0x4,0x0}, // arrow up
-{0x4,0x4,0x4,0x4,0x1f,0xe,0x4,0x0}  //arrow down
-};
-
 typedef struct {
   uint32_t sum_new2;
   uint32_t sum_old2;
@@ -97,12 +76,12 @@ typedef struct {
   uint32_t count_rate_estimator_lg;
   uint32_t count_rate_estimator_st;
   uint16_t reltol_lg;
-  const size_t num_short;
+  size_t num_short;
 } statistics_t;
 
 
 typedef struct {
-  const size_t num_max;
+  size_t num_max;
   volatile size_t head;
   volatile size_t count;
   size_t head_cpy;
@@ -117,10 +96,6 @@ uint32_t get_stats(statistics_t * statistics,
                    const uint16_t num_proceed);
 uint8_t test1( statistics_t * statistics );
 uint8_t test2( statistics_t * statistics );
-char get_indicator (void);
-void set_font (void);
-void uint_to_ascii(char *out_str, uint32_t value,
-                   const uint8_t pos, const uint8_t print);
 
 inline static void
 update_ringbuffer(ringbuf_t * elements, uint32_t accu_counts){
@@ -144,5 +119,5 @@ uint32_t cpm2doserate(uint32_t count_rate){
  return((RES_DOSE*count_rate)/(uint32_t)(CPM_PER_USV_TUBE*(double)(RES_COUNT_RATE)));
 }
 
-#endif /* !FREEMCAN_LCD_H */
+#endif /* !PERSO_GEIGER_LCD_H */
 

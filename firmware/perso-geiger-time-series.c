@@ -52,6 +52,7 @@
 #include "beep.h"
 #include "init-functions.h"
 #include "perso-geiger-lcd.h"
+#include "freemcan-lcd.h"
 
 #ifndef F_CPU
 # error Need F_CPU defined for util/delay.h
@@ -109,17 +110,12 @@ volatile table_element_t *volatile table_end =
 volatile table_element_t *volatile table_cur = table;
 
 
-
 static volatile uint16_t rbuf[NUM_BUF_MAX];
-
-static ringbuf_t elements = {NUM_BUF_MAX,
-                            0,0,0,0,
-                            &rbuf[0]};
+static ringbuf_t elements = {NUM_BUF_MAX,0,0,0,0,&rbuf[0]};
 
 statistics_t statistics = {0,0,0,0,0,0,0,NUM_BUF_MIN};
 
 static volatile uint32_t accu_counts;
-
 /* atomics */
 static volatile uint8_t do_count_stats;
 
