@@ -69,8 +69,9 @@ const size_t table_size = (size_t) data_table_size;
 static volatile table_element_t accu_counts_rbuf;
 
 static volatile uint32_t ofs_wr;
-
-
+static volatile size_t size_to_send;
+static size_t size_to_send_cpy;
+static uint32_t ofs_wr_cpy;
 
 /** Data table info
  *
@@ -142,7 +143,7 @@ ISR(TIMER1_COMPA_vect)
       table_element_copy((volatile table_element_t *)(strt_ptr + ofs_wr),
                          &accu_counts_rbuf);
       table_element_zero(&accu_counts_rbuf);
-      data_table_info.size += (TELEMENT_SIZE);
+      size_to_send += (TELEMENT_SIZE);
       if (ofs_wr < ((table_size) - (TELEMENT_SIZE))){
         ofs_wr += (TELEMENT_SIZE);
       }
@@ -150,12 +151,12 @@ ISR(TIMER1_COMPA_vect)
         ofs_wr = 0;
       }
 
-      if (data_table_info.size < (table_size)) {
+      if (size_to_send < (table_size)) {
         timer1_count = orig_timer1_count;
       } else {
         //in case of overflow overwrite the record data
         timer1_count = orig_timer1_count;
-        data_table_info.size = table_size;
+        size_to_send = table_size;
         //GF_SET(GF_MEASUREMENT_FINISHED);
       }
     }
@@ -203,26 +204,29 @@ void trigger_src_conf(void)
     EIMSK |= (_BV(INT0));
 }
 
-
+size_t get_send_size(void)
+{
+  ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
+    size_to_send_cpy = size_to_send;
+    size_to_send = 0;
+    ofs_wr_cpy = ofs_wr;
+  }
+  data_table_info.size = size_to_send_cpy;
+  return(size_to_send_cpy);
+}
 
 //send the bloody data
 void send_data_from_ringbuf(void)
 {
-  size_t size_to_send;
-  volatile uint32_t ofs_wr_cpy;
-  ATOMIC_BLOCK (ATOMIC_RESTORESTATE){
-    size_to_send = data_table_info.size;
-    ofs_wr_cpy = ofs_wr;
-    data_table_info.size = 0;
-  }
+
   const volatile char * wr_ptr = strt_ptr + ofs_wr_cpy;
   const size_t size_new = wr_ptr - strt_ptr; // = ofs_wr_cpy
-  if (size_new > size_to_send){
-     uart_putb((const void *)(wr_ptr - size_to_send), size_to_send);
+  if (size_new > size_to_send_cpy){
+     uart_putb((const void *)(wr_ptr - size_to_send_cpy), size_to_send_cpy);
   }
   else
   {
-     const size_t size_old = size_to_send - size_new;
+     const size_t size_old = size_to_send_cpy - size_new;
      const volatile char * rd_ptr = end_ptr - size_old;
      uart_putb((const void *)rd_ptr, size_old);
      uart_putb((const void *)strt_ptr, size_new);

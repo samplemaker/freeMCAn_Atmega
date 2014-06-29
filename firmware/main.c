@@ -181,7 +181,7 @@ void send_table(const packet_value_table_reason_t reason)
     pparam_sram.length
   };
   frame_start(FRAME_TYPE_VALUE_TABLE,
-              sizeof(header) + pparam_sram.length + data_table_info.size);
+              sizeof(header) + pparam_sram.length + get_send_size());
   uart_putb((const void *)&header, sizeof(header));
   uart_putb((const void *)pparam_sram.params, pparam_sram.length);
   send_data_from_ringbuf();
