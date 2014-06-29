@@ -64,7 +64,9 @@ int push_xively(const personality_info_t *personality_info,
   printf("timer:%d  interval:%d  elapsed:%d  ecounts:%zu\n\r",
          value_table_packet->duration,tdur,elapsed_time,element_count);
 
-  const time_t start_time = time(NULL) - elapsed_time;
+
+  const time_t start_time = value_table_packet->receive_time - elapsed_time;
+  //const time_t start_time = time(NULL) - elapsed_time;
 
   if ((value_table_packet->reason == PACKET_VALUE_TABLE_INTERMEDIATE) && (element_count > 0)){
    xi_context = xi_create_context(XI_HTTP,
