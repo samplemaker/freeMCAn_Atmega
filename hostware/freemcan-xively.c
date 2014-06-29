@@ -49,6 +49,35 @@ const char *time_to(const time_t time)
   return buf;
 }
 
+
+void print_data(const personality_info_t *personality_info,
+                const packet_value_table_t *value_table_packet)
+{
+/* const time_t start_time = (value_table_packet->token)?
+    *((const time_t *)value_table_packet->token) : 0 ; */
+
+  const size_t element_count = value_table_packet->element_count;
+  const uint32_t elapsed_time = value_table_packet->duration +
+    (value_table_packet->total_duration * (value_table_packet->element_count));
+  const uint32_t tdur  = value_table_packet->total_duration;
+  printf("timer:%d  interval:%d  elapsed:%d  ecounts:%zu\n\r",
+         value_table_packet->duration,tdur,elapsed_time,element_count);
+  const time_t start_time = value_table_packet->receive_time - elapsed_time;
+  //const time_t start_time = time(NULL) - elapsed_time;
+  if ((value_table_packet->reason == PACKET_VALUE_TABLE_INTERMEDIATE) && (element_count > 0)){
+    for (size_t i = 0; i < element_count; i ++){
+      const time_t ts = start_time + i * tdur;
+      const char *st = time_to(ts);
+      const float dose_rate = 60.0*(float)(value_table_packet->elements[i])/
+                              ((float)(tdur)*CPM_PER_USV_TUBE);
+      const float round_data = floorf(dose_rate*1000.0+0.5)/1000.0;
+      printf("%zu\t%u\t%0.2f\t%ld\t%s\n\r", i, value_table_packet->elements[i],
+             round_data, ts, st);
+    }
+  }
+}
+
+
 int push_xively(const personality_info_t *personality_info,
                  const packet_value_table_t *value_table_packet)
 {
