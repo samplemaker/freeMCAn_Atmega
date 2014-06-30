@@ -90,10 +90,10 @@ typedef struct {
 } ringbuf_t;
 
 
-uint16_t avrg_len(uint32_t count_rate_estimator);
+size_t avrg_len(uint32_t count_rate_estimator);
 uint32_t get_stats(statistics_t * statistics,
                    ringbuf_t * elements,
-                   const uint16_t num_proceed);
+                   const size_t num_proceed);
 uint8_t test1( statistics_t * statistics );
 uint8_t test2( statistics_t * statistics );
 

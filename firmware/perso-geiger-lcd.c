@@ -55,7 +55,7 @@ typedef enum {
 /* autoranging controls the record length and gives higher
  * dynamic response at higher count rates
  */
-uint16_t
+size_t
 avrg_len(uint32_t count_rate_estimator){
    uint16_t num_elements = 0;
 
@@ -108,12 +108,12 @@ c_sqrt32 (uint32_t q)
 uint32_t
 get_stats(statistics_t * statistics,
           ringbuf_t * elements,
-          const uint16_t num_proceed){
+          const size_t num_proceed){
 
    /* calculate the sum over various buffer lengths of the recorded data */
-   uint16_t num_proceed2 = (num_proceed >> 1);
-   uint16_t i=0;
-   uint16_t current_pos = elements->head_cpy;
+   size_t num_proceed2 = (num_proceed >> 1);
+   size_t i=0;
+   size_t current_pos = elements->head_cpy;
    uint32_t sum_total = 0;
    while (i < num_proceed) {
       sum_total += elements->rbuf[current_pos];
