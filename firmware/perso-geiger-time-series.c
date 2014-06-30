@@ -68,10 +68,10 @@ const size_t table_size = (size_t) data_table_size;
 
 static volatile table_element_t accu_counts_rbuf;
 
-static volatile uint32_t ofs_wr;
+static volatile size_t ofs_wr;
 static volatile size_t size_to_send;
 static size_t size_to_send_cpy;
-static uint32_t ofs_wr_cpy;
+static size_t ofs_wr_cpy;
 
 /** Data table info
  *
